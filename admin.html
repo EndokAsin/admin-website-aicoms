@@ -43,6 +43,7 @@
                 <button data-tab="anggota" class="admin-tab-button active">Kelola Anggota</button>
                 <button data-tab="berita" class="admin-tab-button">Kelola Berita</button>
                 <button data-tab="proyek" class="admin-tab-button">Kelola Proyek</button>
+                <button data-tab="papers" class="admin-tab-button">Kelola Papers</button>
                 <button data-tab="tags" class="admin-tab-button">Kelola Tags</button>
             </nav>
         </div>
@@ -51,6 +52,7 @@
             <div id="panel-anggota" class="admin-tab-panel active"></div>
             <div id="panel-berita" class="admin-tab-panel"></div>
             <div id="panel-proyek" class="admin-tab-panel"></div>
+            <div id="panel-papers" class="admin-tab-panel"></div>
             <div id="panel-tags" class="admin-tab-panel"></div>
         </div>
     </div>
@@ -110,19 +112,33 @@
                 `;
                 return;
             }
+            renderAllPanels();
+            setupAllLogic();
+            fetchAllData();
+        }
+
+        function renderAllPanels() {
             renderAnggotaPanel();
             renderBeritaPanel();
             renderProyekPanel();
+            renderPapersPanel();
             renderTagsPanel();
+        }
+
+        function setupAllLogic() {
             setupTabLogic();
             setupAnggotaLogic();
             setupBeritaLogic();
             setupProyekLogic();
+            setupPapersLogic();
             setupTagsLogic();
-            
+        }
+
+        function fetchAllData() {
             fetchAnggota();
             fetchBerita();
             fetchProyek();
+            fetchPapers();
             fetchTags();
         }
 
@@ -742,6 +758,149 @@
                     resetForm();
                     fetchTags();
                 }
+            });
+
+            cancelBtn.addEventListener('click', resetForm);
+        }
+
+        // --- PAPERS PANEL ---
+        function renderPapersPanel() {
+            document.getElementById('panel-papers').innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                        <h2 id="paper-form-title" class="text-xl font-bold mb-4">Tambah Paper Baru</h2>
+                        <form id="paper-form" class="space-y-6">
+                            <input type="hidden" id="paper-id"><input type="hidden" id="paper-existing-file-url">
+                            <div><label for="paper-judul" class="form-label">Judul Paper</label><input type="text" id="paper-judul" class="form-input" required></div>
+                            <div><label for="paper-penulis" class="form-label">Penulis (pisahkan koma)</label><input type="text" id="paper-penulis" class="form-input"></div>
+                            <div><label for="paper-jurnal" class="form-label">Jurnal / Konferensi</label><input type="text" id="paper-jurnal" class="form-input"></div>
+                            <div><label for="paper-tahun" class="form-label">Tahun</label><input type="number" id="paper-tahun" class="form-input"></div>
+                            <div><label for="paper-link" class="form-label">Link Publikasi</label><input type="url" id="paper-link" class="form-input" placeholder="https://..."></div>
+                            <div><label class="form-label">File PDF (Opsional)</label><input type="file" id="paper-file-upload" accept=".pdf" class="form-input"></div>
+                            <div class="flex items-center space-x-4 pt-4 border-t"><button type="submit" id="paper-submit-button" class="btn btn-red w-full">Simpan Paper</button><button type="button" id="paper-cancel-button" class="btn btn-gray hidden">Batal</button></div>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 bg-white rounded-lg shadow-md">
+                        <div class="p-6 border-b"><h2 class="text-xl font-bold">Daftar Papers</h2></div>
+                        <div id="papers-list-container" class="p-6 space-y-4"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function fetchPapers() {
+            const listContainer = document.getElementById('papers-list-container');
+            listContainer.innerHTML = '<p class="text-center text-gray-500">Memuat papers...</p>';
+            const { data, error } = await supabase.from('papers').select('*').order('tahun', { ascending: false });
+            if (error) return listContainer.innerHTML = '<p class="text-center text-red-500">Gagal memuat papers.</p>';
+            
+            listContainer.innerHTML = '';
+            data.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'flex items-start space-x-4 p-4 border rounded-lg hover:bg-gray-50';
+                itemDiv.innerHTML = `
+                    <div class="flex-grow">
+                        <p class="text-sm text-gray-500">${item.tahun}</p>
+                        <h3 class="font-bold text-lg text-gray-800">${item.judul}</h3>
+                        <p class="text-sm text-gray-600 italic">${item.penulis}</p>
+                    </div>
+                    <div class="flex-shrink-0 space-x-2">
+                        <button class="text-green-600 hover:text-green-900" onclick="editPaper(${item.id})">Edit</button>
+                        <button class="text-red-600 hover:text-red-900" onclick="deletePaper(${item.id})">Hapus</button>
+                    </div>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        function setupPapersLogic() {
+            const form = document.getElementById('paper-form');
+            const idInput = document.getElementById('paper-id');
+            const existingFileUrlInput = document.getElementById('paper-existing-file-url');
+            const submitButton = document.getElementById('paper-submit-button');
+            const cancelBtn = document.getElementById('paper-cancel-button');
+
+            const resetForm = () => {
+                form.reset();
+                idInput.value = '';
+                existingFileUrlInput.value = '';
+                submitButton.textContent = 'Simpan Paper';
+                submitButton.classList.replace('btn-green', 'btn-red');
+                cancelBtn.classList.add('hidden');
+            };
+
+            window.editPaper = async (id) => {
+                const { data, error } = await supabase.from('papers').select('*').eq('id', id).single();
+                if (error) return showNotification("Gagal mengambil data paper", "error");
+                
+                resetForm();
+                idInput.value = data.id;
+                existingFileUrlInput.value = data.file_url || '';
+                document.getElementById('paper-judul').value = data.judul || '';
+                document.getElementById('paper-penulis').value = data.penulis || '';
+                document.getElementById('paper-jurnal').value = data.jurnal_atau_konferensi || '';
+                document.getElementById('paper-tahun').value = data.tahun || '';
+                document.getElementById('paper-link').value = data.link_publikasi || '';
+                
+                submitButton.textContent = 'Update Paper';
+                submitButton.classList.replace('btn-red', 'btn-green');
+                cancelBtn.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            window.deletePaper = async (id) => {
+                if (!confirm('Yakin ingin menghapus paper ini?')) return;
+                const { data, error } = await supabase.from('papers').delete().eq('id', id).select().single();
+                if (error) return showNotification(`Gagal menghapus: ${error.message}`, 'error');
+
+                if (data && data.file_url) {
+                    const path = new URL(data.file_url).pathname.split('/file-papers/')[1];
+                    await supabase.storage.from('file-papers').remove([path]);
+                }
+                showNotification('Paper berhasil dihapus.', 'success');
+                fetchPapers();
+            };
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const id = idInput.value;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Menyimpan...';
+
+                let fileUrl = existingFileUrlInput.value;
+                const file = document.getElementById('paper-file-upload').files[0];
+
+                if (file) {
+                    const fileName = `papers/${Date.now()}-${file.name}`;
+                    const { error: uploadError } = await supabase.storage.from('file-papers').upload(fileName, file);
+                    if (uploadError) {
+                        showNotification(`Gagal unggah file: ${uploadError.message}`, 'error');
+                        submitButton.disabled = false;
+                        submitButton.textContent = id ? 'Update Paper' : 'Simpan Paper';
+                        return;
+                    }
+                    const { data: urlData } = supabase.storage.from('file-papers').getPublicUrl(fileName);
+                    fileUrl = urlData.publicUrl;
+                }
+
+                const paperData = {
+                    judul: document.getElementById('paper-judul').value,
+                    penulis: document.getElementById('paper-penulis').value,
+                    jurnal_atau_konferensi: document.getElementById('paper-jurnal').value,
+                    tahun: document.getElementById('paper-tahun').value,
+                    link_publikasi: document.getElementById('paper-link').value,
+                    file_url: fileUrl,
+                };
+                
+                const { error } = id ? await supabase.from('papers').update(paperData).eq('id', id) : await supabase.from('papers').insert([paperData]);
+                if (error) showNotification(`Gagal simpan paper: ${error.message}`, 'error');
+                else {
+                    showNotification('Paper berhasil disimpan!', 'success');
+                    resetForm();
+                    fetchPapers();
+                }
+                submitButton.disabled = false;
+                submitButton.textContent = id ? 'Update Paper' : 'Simpan Paper';
             });
 
             cancelBtn.addEventListener('click', resetForm);
