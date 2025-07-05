@@ -39,9 +39,10 @@
         </div>
 
         <div class="mb-4 border-b border-gray-200">
-            <nav id="admin-tabs" class="flex" aria-label="Tabs">
+            <nav id="admin-tabs" class="flex flex-wrap" aria-label="Tabs">
                 <button data-tab="anggota" class="admin-tab-button active">Kelola Anggota</button>
                 <button data-tab="berita" class="admin-tab-button">Kelola Berita</button>
+                <button data-tab="proyek" class="admin-tab-button">Kelola Proyek</button>
                 <button data-tab="tags" class="admin-tab-button">Kelola Tags</button>
             </nav>
         </div>
@@ -49,6 +50,7 @@
         <div id="main-content">
             <div id="panel-anggota" class="admin-tab-panel active"></div>
             <div id="panel-berita" class="admin-tab-panel"></div>
+            <div id="panel-proyek" class="admin-tab-panel"></div>
             <div id="panel-tags" class="admin-tab-panel"></div>
         </div>
     </div>
@@ -110,14 +112,17 @@
             }
             renderAnggotaPanel();
             renderBeritaPanel();
+            renderProyekPanel();
             renderTagsPanel();
             setupTabLogic();
             setupAnggotaLogic();
             setupBeritaLogic();
+            setupProyekLogic();
             setupTagsLogic();
             
             fetchAnggota();
             fetchBerita();
+            fetchProyek();
             fetchTags();
         }
 
@@ -138,7 +143,7 @@
         function renderAnggotaPanel() {
             document.getElementById('panel-anggota').innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div id="anggota-form-card" class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
                         <h2 id="anggota-form-title" class="text-xl font-bold mb-4">Tambah Anggota Baru</h2>
                         <form id="anggota-form" class="space-y-6"></form>
                     </div>
@@ -485,6 +490,156 @@
             gambarUpload.addEventListener('change', (e) => { if (e.target.files[0]) gambarPreview.src = URL.createObjectURL(e.target.files[0]); });
         }
 
+        // --- PROYEK PANEL ---
+        function renderProyekPanel() {
+            document.getElementById('panel-proyek').innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-lg shadow-md">
+                        <h2 id="proyek-form-title" class="text-xl font-bold mb-4">Tambah Proyek Baru</h2>
+                        <form id="proyek-form" class="space-y-6">
+                            <input type="hidden" id="proyek-id"><input type="hidden" id="proyek-existing-gambar-url">
+                            <div><label class="form-label">Gambar Proyek</label><div class="mt-1"><img id="proyek-gambar-preview" src="https://placehold.co/600x400/EFEFEF/AAAAAA?text=Gambar" class="w-full h-40 object-cover bg-gray-100 rounded"><input type="file" id="proyek-gambar-upload" accept="image/*" class="hidden"><button type="button" onclick="document.getElementById('proyek-gambar-upload').click()" class="mt-2 btn bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 w-full">Pilih Gambar</button></div></div>
+                            <div><label for="proyek-judul" class="form-label">Judul Proyek</label><input type="text" id="proyek-judul" class="form-input" required></div>
+                            <div><label for="proyek-kategori" class="form-label">Kategori</label><select id="proyek-kategori" class="form-input"><option>Internasional</option><option>Nasional</option><option>Unggulan</option></select></div>
+                            <div><label for="proyek-deskripsi" class="form-label">Deskripsi Singkat</label><textarea id="proyek-deskripsi" rows="4" class="form-input"></textarea></div>
+                            <div class="flex items-center space-x-4 pt-4 border-t"><button type="submit" id="proyek-submit-button" class="btn btn-red w-full">Simpan Proyek</button><button type="button" id="proyek-cancel-edit-button" class="btn btn-gray hidden">Batal</button></div>
+                        </form>
+                    </div>
+                    <div class="lg:col-span-2 bg-white rounded-lg shadow-md">
+                        <div class="p-6 border-b"><h2 class="text-xl font-bold">Daftar Proyek</h2></div>
+                        <div id="proyek-list-container" class="p-6 space-y-4"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function fetchProyek() {
+            const listContainer = document.getElementById('proyek-list-container');
+            listContainer.innerHTML = '<p class="text-center text-gray-500">Memuat proyek...</p>';
+            const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+            if (error) return listContainer.innerHTML = '<p class="text-center text-red-500">Gagal memuat proyek.</p>';
+            
+            listContainer.innerHTML = '';
+            data.forEach(item => {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'flex items-start space-x-4 p-4 border rounded-lg hover:bg-gray-50';
+                itemDiv.innerHTML = `
+                    <img src="${item.gambar_url || 'https://placehold.co/100x100/EFEFEF/AAAAAA?text=N/A'}" class="w-24 h-24 object-cover rounded-md flex-shrink-0">
+                    <div class="flex-grow">
+                        <span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">${item.kategori}</span>
+                        <h3 class="font-bold text-lg text-gray-800 mt-2">${item.judul}</h3>
+                        <p class="text-sm text-gray-600">${item.deskripsi || ''}</p>
+                    </div>
+                    <div class="flex-shrink-0 space-x-2">
+                        <button class="text-green-600 hover:text-green-900" onclick="editProyek(${item.id})">Edit</button>
+                        <button class="text-red-600 hover:text-red-900" onclick="deleteProyek(${item.id})">Hapus</button>
+                    </div>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        function setupProyekLogic() {
+            const form = document.getElementById('proyek-form');
+            const formCard = document.getElementById('proyek-form-card');
+            const formTitle = document.getElementById('proyek-form-title');
+            const submitButton = document.getElementById('proyek-submit-button');
+            const cancelBtn = document.getElementById('proyek-cancel-edit-button');
+            const gambarUpload = document.getElementById('proyek-gambar-upload');
+            const gambarPreview = document.getElementById('proyek-gambar-preview');
+            const idInput = document.getElementById('proyek-id');
+            const existingGambarUrlInput = document.getElementById('proyek-existing-gambar-url');
+
+            const resetForm = () => {
+                form.reset();
+                idInput.value = '';
+                existingGambarUrlInput.value = '';
+                gambarPreview.src = 'https://placehold.co/600x400/EFEFEF/AAAAAA?text=Gambar';
+                formTitle.innerText = 'Tambah Proyek Baru';
+                submitButton.innerText = 'Simpan Proyek';
+                submitButton.classList.replace('btn-green', 'btn-red');
+                formCard.classList.remove('bg-green-50');
+                cancelBtn.classList.add('hidden');
+            };
+
+            window.editProyek = async (id) => {
+                const { data, error } = await supabase.from('projects').select('*').eq('id', id).single();
+                if (error) return showNotification("Gagal mengambil data proyek", "error");
+                
+                resetForm();
+                formTitle.innerText = 'Edit Proyek';
+                submitButton.innerText = 'Update Proyek';
+                submitButton.classList.replace('btn-red', 'btn-green');
+                formCard.classList.add('bg-green-50');
+
+                idInput.value = data.id;
+                existingGambarUrlInput.value = data.gambar_url || '';
+                gambarPreview.src = data.gambar_url || 'https://placehold.co/600x400/EFEFEF/AAAAAA?text=Gambar';
+                document.getElementById('proyek-judul').value = data.judul || '';
+                document.getElementById('proyek-kategori').value = data.kategori || 'Unggulan';
+                document.getElementById('proyek-deskripsi').value = data.deskripsi || '';
+
+                cancelBtn.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+
+            window.deleteProyek = async (id) => {
+                if (!confirm('Yakin ingin menghapus proyek ini?')) return;
+                const { data, error } = await supabase.from('projects').delete().eq('id', id).select().single();
+                if (error) return showNotification(`Gagal menghapus: ${error.message}`, 'error');
+
+                if (data && data.gambar_url) {
+                    const path = new URL(data.gambar_url).pathname.split('/gambar-proyek/')[1];
+                    await supabase.storage.from('gambar-proyek').remove([path]);
+                }
+                showNotification('Proyek berhasil dihapus.', 'success');
+                fetchProyek();
+            };
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const id = idInput.value;
+                submitButton.disabled = true;
+                submitButton.textContent = 'Menyimpan...';
+
+                let gambarUrl = existingGambarUrlInput.value;
+                const file = gambarUpload.files[0];
+
+                if (file) {
+                    const fileName = `proyek/${Date.now()}-${file.name}`;
+                    const { error: uploadError } = await supabase.storage.from('gambar-proyek').upload(fileName, file);
+                    if (uploadError) {
+                        showNotification(`Gagal unggah gambar: ${uploadError.message}`, 'error');
+                        submitButton.disabled = false;
+                        submitButton.textContent = id ? 'Update Proyek' : 'Simpan Proyek';
+                        return;
+                    }
+                    const { data: urlData } = supabase.storage.from('gambar-proyek').getPublicUrl(fileName);
+                    gambarUrl = urlData.publicUrl;
+                }
+
+                const proyekData = {
+                    judul: document.getElementById('proyek-judul').value,
+                    kategori: document.getElementById('proyek-kategori').value,
+                    deskripsi: document.getElementById('proyek-deskripsi').value,
+                    gambar_url: gambarUrl,
+                };
+                
+                const { error } = id ? await supabase.from('projects').update(proyekData).eq('id', id) : await supabase.from('projects').insert([proyekData]);
+                if (error) showNotification(`Gagal simpan proyek: ${error.message}`, 'error');
+                else {
+                    showNotification('Proyek berhasil disimpan!', 'success');
+                    resetForm();
+                    fetchProyek();
+                }
+                submitButton.disabled = false;
+                submitButton.textContent = id ? 'Update Proyek' : 'Simpan Proyek';
+            });
+
+            cancelBtn.addEventListener('click', resetForm);
+            gambarUpload.addEventListener('change', (e) => { if (e.target.files[0]) gambarPreview.src = URL.createObjectURL(e.target.files[0]); });
+        }
+
         // --- TAGS PANEL ---
         function renderTagsPanel() {
             document.getElementById('panel-tags').innerHTML = `
@@ -505,7 +660,7 @@
                 </div>
             `;
         }
-
+        
         async function fetchTags() {
             const { data, error } = await supabase.from('tags').select('*').order('name');
             if (error) return;
@@ -526,13 +681,15 @@
             });
 
             const checkboxContainer = document.getElementById('berita-tags-checkbox-container');
-            checkboxContainer.innerHTML = '';
-            data.forEach(tag => {
-                const label = document.createElement('label');
-                label.className = 'flex items-center space-x-2';
-                label.innerHTML = `<input type="checkbox" value="${tag.id}" class="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50"><span>${tag.name}</span>`;
-                checkboxContainer.appendChild(label);
-            });
+            if (checkboxContainer) {
+                checkboxContainer.innerHTML = '';
+                data.forEach(tag => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center space-x-2';
+                    label.innerHTML = `<input type="checkbox" value="${tag.id}" class="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50"><span>${tag.name}</span>`;
+                    checkboxContainer.appendChild(label);
+                });
+            }
         }
 
         function setupTagsLogic() {
