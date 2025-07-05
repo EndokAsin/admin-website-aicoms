@@ -72,6 +72,14 @@
                         <input type="text" id="google_scholar_id" class="form-input">
                     </div>
                     <div>
+                        <label for="prodi" class="form-label">Program Studi</label>
+                        <input type="text" id="prodi" class="form-input">
+                    </div>
+                    <div>
+                        <label for="universitas_asal" class="form-label">Universitas Asal</label>
+                        <input type="text" id="universitas_asal" class="form-input">
+                    </div>
+                    <div>
                         <label for="pendidikan" class="form-label">Pendidikan (pisahkan dengan koma)</label>
                         <textarea id="pendidikan" rows="3" class="form-input"></textarea>
                     </div>
@@ -94,7 +102,7 @@
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-xl font-bold mb-4">Unggah Data dari CSV</h2>
                 <p class="text-sm text-gray-600 mb-4">
-                    Pastikan file CSV memiliki header: `nama,jabatan,foto_url,email,scopus_id,google_scholar_id,pendidikan,topik_penelitian,publikasi`. Kolom `pendidikan`, `topik_penelitian`, dan `publikasi` harus dipisahkan dengan titik koma (;) di dalam selnya.
+                    Pastikan file CSV memiliki header: `nama,jabatan,foto_url,email,scopus_id,google_scholar_id,prodi,universitas_asal,pendidikan,topik_penelitian,publikasi`. Kolom `pendidikan`, `topik_penelitian`, dan `publikasi` harus dipisahkan dengan titik koma (;) di dalam selnya.
                 </p>
                 <input type="file" id="csv-file" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"/>
                 <button id="upload-csv-button" class="btn btn-blue mt-4">Unggah CSV</button>
@@ -111,12 +119,13 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jabatan</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Universitas</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                         </tr>
                     </thead>
                     <tbody id="members-table-body" class="bg-white divide-y divide-gray-200">
                         <!-- Data akan diisi oleh JavaScript -->
-                        <tr><td colspan="3" class="p-4 text-center text-gray-500">Memuat data...</td></tr>
+                        <tr><td colspan="4" class="p-4 text-center text-gray-500">Memuat data...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -139,12 +148,12 @@
 
         // Fungsi untuk mengambil dan menampilkan semua anggota
         async function fetchMembers() {
-            tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">Memuat data...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-gray-500">Memuat data...</td></tr>';
             const { data, error } = await supabase.from('anggota').select('*').order('nama', { ascending: true });
 
             if (error) {
                 console.error('Error fetching members:', error);
-                tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-red-500">Gagal memuat data.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-red-500">Gagal memuat data.</td></tr>';
                 return;
             }
 
@@ -154,6 +163,7 @@
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${member.nama}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${member.jabatan}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${member.universitas_asal || ''}</td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                             <button class="text-green-600 hover:text-green-900" onclick="editMember(${member.id})">Edit</button>
                             <button class="text-red-600 hover:text-red-900" onclick="deleteMember(${member.id})">Hapus</button>
@@ -177,6 +187,8 @@
             document.getElementById('email').value = data.email;
             document.getElementById('scopus_id').value = data.scopus_id;
             document.getElementById('google_scholar_id').value = data.google_scholar_id;
+            document.getElementById('prodi').value = data.prodi;
+            document.getElementById('universitas_asal').value = data.universitas_asal;
             // Konversi dari JSON array ke string
             document.getElementById('pendidikan').value = data.pendidikan ? JSON.parse(data.pendidikan).join(', ') : '';
             document.getElementById('topik_penelitian').value = data.topik_penelitian ? JSON.parse(data.topik_penelitian).join(', ') : '';
@@ -225,6 +237,8 @@
                 email: document.getElementById('email').value,
                 scopus_id: document.getElementById('scopus_id').value,
                 google_scholar_id: document.getElementById('google_scholar_id').value,
+                prodi: document.getElementById('prodi').value,
+                universitas_asal: document.getElementById('universitas_asal').value,
                 pendidikan: JSON.stringify(pendidikanText.split(',').map(item => item.trim()).filter(Boolean)),
                 topik_penelitian: JSON.stringify(topikPenelitianText.split(',').map(item => item.trim()).filter(Boolean)),
                 publikasi: JSON.stringify(publikasiText.split('\n').map(item => item.trim()).filter(Boolean)),
@@ -279,6 +293,8 @@
                         email: row.email,
                         scopus_id: row.scopus_id,
                         google_scholar_id: row.google_scholar_id,
+                        prodi: row.prodi,
+                        universitas_asal: row.universitas_asal,
                         pendidikan: JSON.stringify(row.pendidikan ? row.pendidikan.split(';').map(s => s.trim()) : []),
                         topik_penelitian: JSON.stringify(row.topik_penelitian ? row.topik_penelitian.split(';').map(s => s.trim()) : []),
                         publikasi: JSON.stringify(row.publikasi ? row.publikasi.split(';').map(s => s.trim()) : []),
