@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - AICOMS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Impor Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Impor PapaParse untuk membaca file CSV -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .form-label {
+            @apply block text-sm font-medium text-gray-700 mb-1;
+        }
+        .form-input {
+            @apply block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm;
+        }
+        .btn {
+            @apply inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white transition-colors;
+        }
+        .btn-red {
+            @apply bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500;
+        }
+        .btn-green {
+            @apply bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500;
+        }
+        .btn-blue {
+            @apply bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500;
+        }
+        .btn-gray {
+            @apply bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">Admin Panel AICOMS</h1>
+
+        <!-- Bagian Tambah Anggota dan Upload CSV -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <!-- Form Tambah/Edit Anggota -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 id="form-title" class="text-xl font-bold mb-4">Tambah Anggota Baru</h2>
+                <form id="member-form" class="space-y-4">
+                    <input type="hidden" id="member-id">
+                    <div>
+                        <label for="nama" class="form-label">Nama Lengkap</label>
+                        <input type="text" id="nama" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="jabatan" class="form-label">Jabatan</label>
+                        <input type="text" id="jabatan" class="form-input">
+                    </div>
+                    <div>
+                        <label for="foto_url" class="form-label">URL Foto</label>
+                        <input type="url" id="foto_url" class="form-input">
+                    </div>
+                    <div>
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" id="email" class="form-input">
+                    </div>
+                    <div>
+                        <label for="scopus_id" class="form-label">Scopus ID</label>
+                        <input type="text" id="scopus_id" class="form-input">
+                    </div>
+                     <div>
+                        <label for="google_scholar_id" class="form-label">Google Scholar ID</label>
+                        <input type="text" id="google_scholar_id" class="form-input">
+                    </div>
+                    <div>
+                        <label for="pendidikan" class="form-label">Pendidikan (pisahkan dengan koma)</label>
+                        <textarea id="pendidikan" rows="3" class="form-input"></textarea>
+                    </div>
+                    <div>
+                        <label for="topik_penelitian" class="form-label">Topik Penelitian (pisahkan dengan koma)</label>
+                        <textarea id="topik_penelitian" rows="3" class="form-input"></textarea>
+                    </div>
+                     <div>
+                        <label for="publikasi" class="form-label">Publikasi (pisahkan dengan baris baru)</label>
+                        <textarea id="publikasi" rows="4" class="form-input"></textarea>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button type="submit" id="submit-button" class="btn btn-red">Simpan</button>
+                        <button type="button" id="cancel-edit-button" class="btn btn-gray hidden">Batal Edit</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Upload CSV -->
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-xl font-bold mb-4">Unggah Data dari CSV</h2>
+                <p class="text-sm text-gray-600 mb-4">
+                    Pastikan file CSV memiliki header: `nama,jabatan,foto_url,email,scopus_id,google_scholar_id,pendidikan,topik_penelitian,publikasi`. Kolom `pendidikan`, `topik_penelitian`, dan `publikasi` harus dipisahkan dengan titik koma (;) di dalam selnya.
+                </p>
+                <input type="file" id="csv-file" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"/>
+                <button id="upload-csv-button" class="btn btn-blue mt-4">Unggah CSV</button>
+                <div id="csv-status" class="mt-4 text-sm"></div>
+            </div>
+        </div>
+
+        <!-- Daftar Anggota -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-bold mb-4">Daftar Anggota Tim</h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jabatan</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="members-table-body" class="bg-white divide-y divide-gray-200">
+                        <!-- Data akan diisi oleh JavaScript -->
+                        <tr><td colspan="3" class="p-4 text-center text-gray-500">Memuat data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- KONEKSI SUPABASE ---
+        const SUPABASE_URL = 'https://ostoxfgxxjfbvfouydiv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zdG94Zmd4eGpmYnZmb3V5ZGl2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2OTI1MzcsImV4cCI6MjA2NzI2ODUzN30.PqEWjFaTGZZmQ5o2rNmv2G34k1-UKfloU_ETDxhwcro';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const form = document.getElementById('member-form');
+        const formTitle = document.getElementById('form-title');
+        const memberIdInput = document.getElementById('member-id');
+        const cancelEditBtn = document.getElementById('cancel-edit-button');
+        const tableBody = document.getElementById('members-table-body');
+
+        // --- FUNGSI ---
+
+        // Fungsi untuk mengambil dan menampilkan semua anggota
+        async function fetchMembers() {
+            tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-gray-500">Memuat data...</td></tr>';
+            const { data, error } = await supabase.from('anggota').select('*').order('nama', { ascending: true });
+
+            if (error) {
+                console.error('Error fetching members:', error);
+                tableBody.innerHTML = '<tr><td colspan="3" class="p-4 text-center text-red-500">Gagal memuat data.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            data.forEach(member => {
+                const row = `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${member.nama}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${member.jabatan}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button class="text-green-600 hover:text-green-900" onclick="editMember(${member.id})">Edit</button>
+                            <button class="text-red-600 hover:text-red-900" onclick="deleteMember(${member.id})">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        }
+
+        // Fungsi untuk mengisi form saat tombol edit diklik
+        window.editMember = async (id) => {
+            const { data, error } = await supabase.from('anggota').select('*').eq('id', id).single();
+            if (error) return console.error("Gagal mengambil data untuk diedit", error);
+
+            formTitle.innerText = 'Edit Anggota';
+            memberIdInput.value = data.id;
+            document.getElementById('nama').value = data.nama;
+            document.getElementById('jabatan').value = data.jabatan;
+            document.getElementById('foto_url').value = data.foto_url;
+            document.getElementById('email').value = data.email;
+            document.getElementById('scopus_id').value = data.scopus_id;
+            document.getElementById('google_scholar_id').value = data.google_scholar_id;
+            // Konversi dari JSON array ke string
+            document.getElementById('pendidikan').value = data.pendidikan ? JSON.parse(data.pendidikan).join(', ') : '';
+            document.getElementById('topik_penelitian').value = data.topik_penelitian ? JSON.parse(data.topik_penelitian).join(', ') : '';
+            document.getElementById('publikasi').value = data.publikasi ? JSON.parse(data.publikasi).join('\n') : '';
+
+            cancelEditBtn.classList.remove('hidden');
+            window.scrollTo(0, 0);
+        }
+
+        // Fungsi untuk menghapus anggota
+        window.deleteMember = async (id) => {
+            if (!confirm('Apakah Anda yakin ingin menghapus anggota ini?')) return;
+
+            const { error } = await supabase.from('anggota').delete().eq('id', id);
+            if (error) {
+                console.error('Error deleting member:', error);
+                alert('Gagal menghapus anggota.');
+            } else {
+                alert('Anggota berhasil dihapus.');
+                fetchMembers();
+            }
+        }
+        
+        // Fungsi untuk mereset form
+        function resetForm() {
+            form.reset();
+            memberIdInput.value = '';
+            formTitle.innerText = 'Tambah Anggota Baru';
+            cancelEditBtn.classList.add('hidden');
+        }
+
+        // Event listener untuk form submit (tambah/update)
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = memberIdInput.value;
+
+            // Konversi string ke JSON array
+            const pendidikanText = document.getElementById('pendidikan').value;
+            const topikPenelitianText = document.getElementById('topik_penelitian').value;
+            const publikasiText = document.getElementById('publikasi').value;
+
+            const memberData = {
+                nama: document.getElementById('nama').value,
+                jabatan: document.getElementById('jabatan').value,
+                foto_url: document.getElementById('foto_url').value,
+                email: document.getElementById('email').value,
+                scopus_id: document.getElementById('scopus_id').value,
+                google_scholar_id: document.getElementById('google_scholar_id').value,
+                pendidikan: JSON.stringify(pendidikanText.split(',').map(item => item.trim()).filter(Boolean)),
+                topik_penelitian: JSON.stringify(topikPenelitianText.split(',').map(item => item.trim()).filter(Boolean)),
+                publikasi: JSON.stringify(publikasiText.split('\n').map(item => item.trim()).filter(Boolean)),
+            };
+
+            let error;
+            if (id) { // Mode Edit
+                const { error: updateError } = await supabase.from('anggota').update(memberData).eq('id', id);
+                error = updateError;
+            } else { // Mode Tambah
+                const { error: insertError } = await supabase.from('anggota').insert([memberData]);
+                error = insertError;
+            }
+
+            if (error) {
+                console.error('Error saving data:', error);
+                alert('Gagal menyimpan data.');
+            } else {
+                alert('Data berhasil disimpan!');
+                resetForm();
+                fetchMembers();
+            }
+        });
+
+        // Event listener untuk tombol batal edit
+        cancelEditBtn.addEventListener('click', resetForm);
+
+        // --- FUNGSI UPLOAD CSV ---
+        const uploadCsvBtn = document.getElementById('upload-csv-button');
+        const csvFileInput = document.getElementById('csv-file');
+        const csvStatus = document.getElementById('csv-status');
+
+        uploadCsvBtn.addEventListener('click', () => {
+            const file = csvFileInput.files[0];
+            if (!file) {
+                csvStatus.textContent = 'Silakan pilih file CSV terlebih dahulu.';
+                csvStatus.className = 'mt-4 text-sm text-red-600';
+                return;
+            }
+
+            csvStatus.textContent = 'Memproses file...';
+            csvStatus.className = 'mt-4 text-sm text-blue-600';
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async (results) => {
+                    const dataToInsert = results.data.map(row => ({
+                        nama: row.nama,
+                        jabatan: row.jabatan,
+                        foto_url: row.foto_url,
+                        email: row.email,
+                        scopus_id: row.scopus_id,
+                        google_scholar_id: row.google_scholar_id,
+                        pendidikan: JSON.stringify(row.pendidikan ? row.pendidikan.split(';').map(s => s.trim()) : []),
+                        topik_penelitian: JSON.stringify(row.topik_penelitian ? row.topik_penelitian.split(';').map(s => s.trim()) : []),
+                        publikasi: JSON.stringify(row.publikasi ? row.publikasi.split(';').map(s => s.trim()) : []),
+                    }));
+
+                    if (dataToInsert.length === 0) {
+                        csvStatus.textContent = 'Tidak ada data valid untuk diunggah.';
+                        csvStatus.className = 'mt-4 text-sm text-red-600';
+                        return;
+                    }
+
+                    const { error } = await supabase.from('anggota').insert(dataToInsert);
+
+                    if (error) {
+                        console.error('Error inserting CSV data:', error);
+                        csvStatus.textContent = `Gagal mengunggah data: ${error.message}`;
+                        csvStatus.className = 'mt-4 text-sm text-red-600';
+                    } else {
+                        csvStatus.textContent = `${dataToInsert.length} anggota berhasil ditambahkan!`;
+                        csvStatus.className = 'mt-4 text-sm text-green-600';
+                        fetchMembers(); // Muat ulang daftar anggota
+                        csvFileInput.value = ''; // Reset input file
+                    }
+                },
+                error: (error) => {
+                    console.error('Error parsing CSV:', error);
+                    csvStatus.textContent = `Gagal memproses file CSV: ${error.message}`;
+                    csvStatus.className = 'mt-4 text-sm text-red-600';
+                }
+            });
+        });
+
+        // Muat data saat halaman pertama kali dibuka
+        fetchMembers();
+    </script>
+</body>
+</html>
