@@ -780,9 +780,16 @@
                             <div class="flex items-center space-x-4 pt-4 border-t"><button type="submit" id="paper-submit-button" class="btn btn-red w-full">Simpan Paper</button><button type="button" id="paper-cancel-button" class="btn btn-gray hidden">Batal</button></div>
                         </form>
                     </div>
-                    <div class="lg:col-span-2 bg-white rounded-lg shadow-md">
-                        <div class="p-6 border-b"><h2 class="text-xl font-bold">Daftar Papers</h2></div>
-                        <div id="papers-list-container" class="p-6 space-y-4"></div>
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-xl font-bold mb-4">Unggah Papers dari CSV</h2>
+                            <p class="text-sm text-gray-600 mb-4">Format header: <code>judul,penulis,jurnal_atau_konferensi,tahun,link_publikasi</code></p>
+                            <div class="flex items-center space-x-4"><input type="file" id="papers-csv-file" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-red-700 hover:file:bg-red-100"/><button id="papers-upload-csv-button" class="btn btn-blue flex-shrink-0">Unggah</button></div>
+                        </div>
+                        <div class="bg-white rounded-lg shadow-md">
+                            <div class="p-6 border-b"><h2 class="text-xl font-bold">Daftar Papers</h2></div>
+                            <div id="papers-list-container" class="p-6 space-y-4"></div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -819,6 +826,8 @@
             const existingFileUrlInput = document.getElementById('paper-existing-file-url');
             const submitButton = document.getElementById('paper-submit-button');
             const cancelBtn = document.getElementById('paper-cancel-button');
+            const uploadCsvBtn = document.getElementById('papers-upload-csv-button');
+            const csvFileInput = document.getElementById('papers-csv-file');
 
             const resetForm = () => {
                 form.reset();
@@ -904,6 +913,36 @@
             });
 
             cancelBtn.addEventListener('click', resetForm);
+            
+            uploadCsvBtn.addEventListener('click', () => {
+                const file = csvFileInput.files[0];
+                if (!file) return showNotification('Pilih file CSV terlebih dahulu.', 'error');
+                
+                showNotification('Memproses file...', 'info');
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: async (results) => {
+                        const dataToInsert = results.data.map(row => ({
+                            judul: row.judul,
+                            penulis: row.penulis,
+                            jurnal_atau_konferensi: row.jurnal_atau_konferensi,
+                            tahun: row.tahun,
+                            link_publikasi: row.link_publikasi,
+                        }));
+                        
+                        if (dataToInsert.length === 0) return showNotification('Tidak ada data valid.', 'error');
+                        
+                        const { error } = await supabase.from('papers').insert(dataToInsert);
+                        if (error) showNotification(`Gagal unggah: ${error.message}`, 'error');
+                        else {
+                            showNotification(`${dataToInsert.length} paper berhasil ditambahkan!`, 'success');
+                            fetchPapers();
+                            csvFileInput.value = '';
+                        }
+                    }
+                });
+            });
         }
 
     </script>
